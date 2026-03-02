@@ -1,0 +1,50 @@
+# @sirrlock/n8n-nodes-sirr — Sirr n8n Community Node
+
+n8n community node for the Sirr ephemeral secret vault.
+Provides a single node with resource/operation dropdowns covering the full Sirr REST API.
+
+## Install
+
+In n8n: Settings → Community nodes → Install → `@sirrlock/n8n-nodes-sirr`
+
+## Credentials
+
+Add "Sirr API" credentials: serverUrl + apiToken (sent as Bearer token).
+
+## Node Operations
+
+Resource: Secret
+  - Get, Push, List, Delete, Prune
+
+Resource: Audit
+  - Query (since, until, action, limit)
+
+Resource: Webhook
+  - Create, List, Delete
+
+Resource: Principal Key
+  - Create, List, Delete
+
+Resource: Me
+  - Get, Update
+
+Resource: Org
+  - Create, List, Delete
+
+Resource: Principal
+  - Create, List, Delete
+
+Resource: Role
+  - Create, List, Delete
+
+Resource: Server
+  - Health Check
+
+## Org Mode
+
+All secret/audit/webhook/prune operations automatically route to
+/orgs/{org_id}/... when an Organization ID is provided.
+
+## Source
+
+github.com/sirrlock/n8n

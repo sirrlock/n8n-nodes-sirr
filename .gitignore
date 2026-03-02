@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.js
+*.d.ts
+*.js.map
+!tsconfig.json
+!package.json
+
+# IDE
+.idea/
+
+# macOS
+.DS_Store
+
+# Local dev
+.claude/
+.worktrees/
+.playwright-mcp/
