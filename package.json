@@ -38,6 +38,14 @@
       "dist/nodes/Sirr/Sirr.node.js"
     ]
   },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/nodes/**/*.test.ts"],
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.test.json" }]
+    }
+  },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
