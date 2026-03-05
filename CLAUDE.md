@@ -41,14 +41,18 @@ nodes/Sirr/
 | POST | /webhooks | Bearer | Create webhook |
 | GET | /webhooks | Bearer | List webhooks |
 | DELETE | /webhooks/:id | Bearer | Delete webhook |
-| POST | /keys | Bearer | Create API key |
-| GET | /keys | Bearer | List API keys |
-| DELETE | /keys/:id | Bearer | Delete API key |
+| GET | /me | Bearer | Get current principal |
+| PATCH | /me | Bearer | Update principal metadata |
+| POST | /me/keys | Bearer | Create principal API key |
+| DELETE | /me/keys/:key_id | Bearer | Delete principal API key |
 | GET | /health | None | Health check |
+
+Org-scoped variants exist for secrets, prune, audit, and webhooks under `/orgs/{org_id}/...`.
 
 ## Key Rules
 
 - Health check endpoint does NOT use auth headers
 - Secret key names must be URL-encoded in path params
 - `ttl_seconds` and `max_reads` use `null` (not 0) for "no limit"
-- API key creation returns the raw key once — must be saved immediately
+- `POST /me/keys` body: `{ name, valid_for_seconds?, valid_before? }` — raw token returned once, save immediately
+- `PATCH /me` body: `{ metadata: { key: value, ... } }` — arbitrary string key-value map

@@ -1,8 +1,14 @@
 {
   "name": "@sirrlock/n8n-nodes-sirr",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "n8n community node for Sirr — ephemeral secret management",
-  "keywords": ["n8n-community-node-package", "n8n", "sirr", "secrets", "ephemeral"],
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "sirr",
+    "secrets",
+    "ephemeral"
+  ],
   "license": "MIT",
   "author": {
     "name": "Sirr Security Inc.",
@@ -16,6 +22,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "jest --testPathIgnorePatterns='e2e'",
+    "test:e2e": "jest --testMatch='**/nodes/**/*.e2e.test.ts'",
     "prepublishOnly": "npm run build"
   },
   "files": [
@@ -31,7 +39,10 @@
     ]
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
     "n8n-workflow": "^1.0.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.4.0"
   },
   "peerDependencies": {
