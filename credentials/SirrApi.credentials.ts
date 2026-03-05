@@ -14,7 +14,7 @@ export class SirrApi implements ICredentialType {
       displayName: 'Server URL',
       name: 'serverUrl',
       type: 'string',
-      default: 'http://localhost:39999',
+      default: 'https://sirr.sirrlock.com',
       placeholder: 'https://sirr.example.com',
       description: 'Base URL of your Sirr server (no trailing slash)',
     },
