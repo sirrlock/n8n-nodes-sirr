@@ -31,7 +31,7 @@ Create a **Sirr API** credential with:
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| Server URL | Base URL of your Sirr server | `http://localhost:39999` |
+| Server URL | Base URL of your Sirr server | `https://sirrlock.com` |
 | API Token | Bearer token (master key or principal API key) | — |
 | Organization ID | Optional org ID for multi-tenant mode (leave empty for public bucket) | — |
 
@@ -39,7 +39,7 @@ Create a **Sirr API** credential with:
 
 | Resource | Operations |
 |----------|-----------|
-| Secret | Get, Check (HEAD), Push, Patch, List, Delete, Prune |
+| Secret | Get, Check (HEAD), Push (value-only dead drop), Set (org key-value), List, Delete, Prune |
 | Audit | Query |
 | Webhook | Create, List, Delete |
 | Principal | Get Me, Update Me, Create Key, Delete Key, Create Principal, List Principals, Delete Principal |
@@ -56,10 +56,12 @@ explicit org ID parameters and are not affected by the credential's Organization
 
 ### Secret Operations
 
-- **Get** — fetch and consume a secret (`GET /secrets/{key}`)
+- **Get** — fetch and consume a secret by ID or org-scoped key (`GET /secrets/{idOrKey}`)
 - **Check** — inspect metadata via HEAD without consuming a read counter (`HEAD /secrets/{key}`)
-- **Push** — store a secret with optional TTL, max reads, seal-on-expiry, and allowed-keys
-- **Patch** — update an existing secret's value, TTL, or read limit (`PATCH /secrets/{key}`)
+- **Push** — store a public dead drop (value only, no key) with optional TTL and max reads. Returns `{ id, url }`. The URL can be shared directly.
+- **Set** — store an org-scoped named secret (key + value). Requires an org. Returns `{ id }`. On conflict (key already exists), the behavior depends on the **On Conflict** option:
+  - *Error* (default) — fails with 409
+  - *Skip* — silently ignores the conflict
 - **List** — list all active secrets
 - **Delete** — permanently remove a secret
 - **Prune** — delete all expired secrets
