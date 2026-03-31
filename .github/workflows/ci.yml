@@ -40,6 +40,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - run: npm install -g npm@latest  # OIDC trusted publishing requires npm >= 11.5.1
       - run: npm ci
 
       - name: Set version
@@ -53,6 +54,6 @@ jobs:
       #
       # One-time setup required on npmjs.com before first automated publish:
       #   @sirrlock/n8n-nodes-sirr → Settings → Publishing → Trusted Publishers
-      #   Repository: sirrlock/n8n   Workflow: ci.yml   Environment: (none)
+      #   Repository: sirrlock/n8n-nodes-sirr   Workflow: ci.yml   Environment: (none)
       - name: Publish to npm
         run: npm publish --provenance --access public
