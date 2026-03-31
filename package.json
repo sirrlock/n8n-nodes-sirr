@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sirrlock/n8n-nodes-sirr.git"
+    "url": "git+https://github.com/sirrlock/n8n-nodes-sirr.git"
   },
   "main": "dist/nodes/Sirr/Sirr.node.js",
   "scripts": {
@@ -41,9 +41,16 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/nodes/**/*.test.ts"],
+    "testMatch": [
+      "**/nodes/**/*.test.ts"
+    ],
     "transform": {
-      "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.test.json" }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
     }
   },
   "devDependencies": {
