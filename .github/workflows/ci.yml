@@ -34,10 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No registry-url here — setup-node writes an .npmrc expecting NODE_AUTH_TOKEN,
+      # which conflicts with OIDC auth. OIDC needs a clean environment.
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
       - run: npm ci
@@ -47,6 +48,12 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
         run: npm version "1.0.${RUN_NUMBER}" --no-git-tag-version
 
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm detects ACTIONS_ID_TOKEN_REQUEST_TOKEN in the environment and exchanges
+      # the GitHub OIDC token for a granular npm publish token automatically.
+      # No NPM_TOKEN secret needed.
+      #
+      # One-time setup required on npmjs.com before first automated publish:
+      #   @sirrlock/n8n-nodes-sirr → Settings → Publishing → Trusted Publishers
+      #   Repository: sirrlock/n8n   Workflow: ci.yml   Environment: (none)
+      - name: Publish to npm
+        run: npm publish --provenance --access public
