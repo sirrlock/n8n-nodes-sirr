@@ -5,7 +5,7 @@
  *   sirrd --data-dir /tmp/sirr-e2e &
  *   export SIRR_EXTERNAL=1
  *   export SIRR_SERVER="http://127.0.0.1:39999"   # default
- *   export SIRR_API_KEY="<master-key>"
+ *   export SIRR_MASTER_API_KEY="<master-key>"
  *
  *   npm run test:e2e
  *
@@ -18,7 +18,7 @@ import { Sirr } from './Sirr.node';
 
 const EXTERNAL = process.env.SIRR_EXTERNAL === '1';
 const SERVER = (process.env.SIRR_SERVER ?? 'http://127.0.0.1:39999').replace(/\/$/, '');
-const API_KEY = process.env.SIRR_API_KEY ?? '';
+const API_KEY = process.env.SIRR_MASTER_API_KEY ?? '';
 
 // Skip the entire suite when SIRR_EXTERNAL is not set
 const describeE2E = EXTERNAL ? describe : describe.skip;

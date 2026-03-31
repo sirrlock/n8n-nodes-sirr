@@ -139,105 +139,99 @@ describe('secret.check', () => {
 });
 
 describe('secret.push', () => {
-  it('sends POST /secrets with correct body', async () => {
+  it('sends POST /secrets with value only (no key)', async () => {
     const ctx = makeCtx({
       resource: 'secret',
       operation: 'push',
-      pushKey: 'API_KEY',
       value: 'secret-value',
       ttlSeconds: 3600,
       maxReads: 1,
-      sealOnExpiry: false,
-      allowedKeys: '',
     });
+    ctx.helpers.httpRequestWithAuthentication.mockResolvedValue({ id: 'abc123' });
     await run(ctx);
     expect(lastReq(ctx).method).toBe('POST');
     expect(lastReq(ctx).url).toBe('http://localhost:39999/secrets');
-    expect(lastReq(ctx).body).toEqual({ key: 'API_KEY', value: 'secret-value', ttl_seconds: 3600, max_reads: 1 });
+    expect(lastReq(ctx).body).toEqual({ value: 'secret-value', ttl_seconds: 3600, max_reads: 1 });
   });
 
-  it('sends null for ttl and maxReads when 0', async () => {
+  it('omits ttl and maxReads when 0', async () => {
     const ctx = makeCtx({
       resource: 'secret',
       operation: 'push',
-      pushKey: 'K',
       value: 'v',
       ttlSeconds: 0,
       maxReads: 0,
-      sealOnExpiry: false,
-      allowedKeys: '',
     });
+    ctx.helpers.httpRequestWithAuthentication.mockResolvedValue({ id: 'def456' });
     await run(ctx);
-    expect(lastReq(ctx).body).toEqual({ key: 'K', value: 'v', ttl_seconds: null, max_reads: null });
+    expect(lastReq(ctx).body).toEqual({ value: 'v' });
   });
 
-  it('sends delete:false when sealOnExpiry is true', async () => {
-    const ctx = makeCtx({
-      resource: 'secret',
-      operation: 'push',
-      pushKey: 'K',
-      value: 'v',
-      ttlSeconds: 300,
-      maxReads: 1,
-      sealOnExpiry: true,
-      allowedKeys: '',
-    });
-    await run(ctx);
-    expect((lastReq(ctx).body as Record<string, unknown>).delete).toBe(false);
-  });
-
-  it('does not send delete field when sealOnExpiry is false', async () => {
-    const ctx = makeCtx({
-      resource: 'secret',
-      operation: 'push',
-      pushKey: 'K',
-      value: 'v',
-      ttlSeconds: 0,
-      maxReads: 0,
-      sealOnExpiry: false,
-      allowedKeys: '',
-    });
-    await run(ctx);
-    expect((lastReq(ctx).body as Record<string, unknown>).delete).toBeUndefined();
-  });
-
-  it('sends allowed_keys array when set', async () => {
-    const ctx = makeCtx({
-      resource: 'secret',
-      operation: 'push',
-      pushKey: 'K',
-      value: 'v',
-      ttlSeconds: 0,
-      maxReads: 0,
-      sealOnExpiry: false,
-      allowedKeys: 'key-a, key-b',
-    });
-    await run(ctx);
-    expect((lastReq(ctx).body as Record<string, unknown>).allowed_keys).toEqual(['key-a', 'key-b']);
-  });
-
-  it('does not send allowed_keys when empty', async () => {
-    const ctx = makeCtx({
-      resource: 'secret',
-      operation: 'push',
-      pushKey: 'K',
-      value: 'v',
-      ttlSeconds: 0,
-      maxReads: 0,
-      sealOnExpiry: false,
-      allowedKeys: '',
-    });
-    await run(ctx);
-    expect((lastReq(ctx).body as Record<string, unknown>).allowed_keys).toBeUndefined();
-  });
-
-  it('routes through org', async () => {
+  it('does not route through org even when org is set', async () => {
+    // Push is always public — org credential must be ignored
     const ctx = makeCtx(
-      { resource: 'secret', operation: 'push', pushKey: 'K', value: 'v', ttlSeconds: 0, maxReads: 0, sealOnExpiry: false, allowedKeys: '' },
+      { resource: 'secret', operation: 'push', value: 'v', ttlSeconds: 0, maxReads: 0 },
       { org: 'org_xyz' },
     );
+    ctx.helpers.httpRequestWithAuthentication.mockResolvedValue({ id: 'ghi789' });
     await run(ctx);
-    expect(lastReq(ctx).url).toBe('http://localhost:39999/orgs/org_xyz/secrets');
+    expect(lastReq(ctx).url).toBe('http://localhost:39999/secrets');
+  });
+
+  it('returns the id from the response', async () => {
+    const ctx = makeCtx({
+      resource: 'secret',
+      operation: 'push',
+      value: 'my-secret',
+      ttlSeconds: 0,
+      maxReads: 0,
+    });
+    ctx.helpers.httpRequestWithAuthentication.mockResolvedValue({ id: 'deadbeef' });
+    const result = await run(ctx);
+    expect((result[0][0].json as Record<string, unknown>).id).toBe('deadbeef');
+  });
+});
+
+describe('secret.set', () => {
+  it('sends POST /orgs/:org/secrets with key and value', async () => {
+    const ctx = makeCtx(
+      { resource: 'secret', operation: 'set', setKey: 'DB_URL', setValue: 'postgres://...', setOnConflict: 'error' },
+      { org: 'org_abc' },
+    );
+    await run(ctx);
+    expect(lastReq(ctx).method).toBe('POST');
+    expect(lastReq(ctx).url).toBe('http://localhost:39999/orgs/org_abc/secrets');
+    expect(lastReq(ctx).body).toEqual({ key: 'DB_URL', value: 'postgres://...' });
+  });
+
+  it('throws when no org is configured', async () => {
+    const ctx = makeCtx(
+      { resource: 'secret', operation: 'set', setKey: 'K', setValue: 'v', setOnConflict: 'error' },
+      { org: '' },
+    );
+    await expect(run(ctx)).rejects.toThrow('Set requires an Organization ID');
+  });
+
+  it('throws on 409 when onConflict is error', async () => {
+    const ctx = makeCtx(
+      { resource: 'secret', operation: 'set', setKey: 'K', setValue: 'v', setOnConflict: 'error' },
+      { org: 'org_abc' },
+    );
+    const conflictErr = Object.assign(new Error('Conflict'), { response: { statusCode: 409 } });
+    ctx.helpers.httpRequestWithAuthentication.mockRejectedValue(conflictErr);
+    await expect(run(ctx)).rejects.toThrow();
+  });
+
+  it('returns conflict object on 409 when onConflict is ignore', async () => {
+    const ctx = makeCtx(
+      { resource: 'secret', operation: 'set', setKey: 'MY_KEY', setValue: 'v', setOnConflict: 'ignore' },
+      { org: 'org_abc' },
+    );
+    const conflictErr = Object.assign(new Error('Conflict'), { response: { statusCode: 409 } });
+    ctx.helpers.httpRequestWithAuthentication.mockRejectedValue(conflictErr);
+    const result = await run(ctx);
+    expect((result[0][0].json as Record<string, unknown>).conflict).toBe(true);
+    expect((result[0][0].json as Record<string, unknown>).key).toBe('MY_KEY');
   });
 });
 

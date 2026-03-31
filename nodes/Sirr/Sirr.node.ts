@@ -64,7 +64,8 @@ export class Sirr implements INodeType {
         options: [
           { name: 'Get', value: 'get', action: 'Get a secret' },
           { name: 'Check', value: 'check', action: 'Check a secret exists without consuming a read' },
-          { name: 'Push', value: 'push', action: 'Push a secret' },
+          { name: 'Push', value: 'push', action: 'Push an anonymous secret (public dead drop, returns ID)' },
+          { name: 'Set', value: 'set', action: 'Set a named secret in an org' },
           { name: 'Patch', value: 'patch', action: 'Update an existing secret' },
           { name: 'List', value: 'list', action: 'List all secrets' },
           { name: 'Delete', value: 'delete', action: 'Delete a secret' },
@@ -73,7 +74,7 @@ export class Sirr implements INodeType {
         default: 'get',
       },
       {
-        displayName: 'Key',
+        displayName: 'ID or Key',
         name: 'key',
         type: 'string',
         default: '',
@@ -81,19 +82,9 @@ export class Sirr implements INodeType {
         displayOptions: {
           show: { resource: ['secret'], operation: ['get', 'check', 'patch', 'delete'] },
         },
-        description: 'The secret key name',
+        description: 'Public secret ID (hex64) for anonymous secrets, or named key for org secrets',
       },
-      {
-        displayName: 'Key',
-        name: 'pushKey',
-        type: 'string',
-        default: '',
-        required: true,
-        displayOptions: {
-          show: { resource: ['secret'], operation: ['push'] },
-        },
-        description: 'The key to store the secret under',
-      },
+      /* ── Push (public dead drop) ────── */
       {
         displayName: 'Value',
         name: 'value',
@@ -104,7 +95,7 @@ export class Sirr implements INodeType {
         displayOptions: {
           show: { resource: ['secret'], operation: ['push'] },
         },
-        description: 'The secret value',
+        description: 'The secret value to store',
       },
       {
         displayName: 'TTL (Seconds)',
@@ -124,27 +115,45 @@ export class Sirr implements INodeType {
         displayOptions: {
           show: { resource: ['secret'], operation: ['push'] },
         },
-        description: 'Maximum number of reads (0 = unlimited)',
+        description: 'Maximum number of reads before the secret is destroyed (0 = unlimited)',
       },
+      /* ── Set (org named secret) ─────── */
       {
-        displayName: 'Seal on Expiry',
-        name: 'sealOnExpiry',
-        type: 'boolean',
-        default: false,
-        displayOptions: {
-          show: { resource: ['secret'], operation: ['push'] },
-        },
-        description: 'When true, the secret is sealed (returns 410 Gone) when reads are exhausted instead of being deleted. Sealed secrets can be updated via Patch.',
-      },
-      {
-        displayName: 'Allowed Keys',
-        name: 'allowedKeys',
+        displayName: 'Key',
+        name: 'setKey',
         type: 'string',
         default: '',
+        required: true,
         displayOptions: {
-          show: { resource: ['secret'], operation: ['push'] },
+          show: { resource: ['secret'], operation: ['set'] },
         },
-        description: 'Comma-separated list of principal key names allowed to read this secret (org-scoped only; leave empty to allow any authenticated principal)',
+        description: 'The named key to store the secret under (org-scoped)',
+      },
+      {
+        displayName: 'Value',
+        name: 'setValue',
+        type: 'string',
+        typeOptions: { password: true },
+        default: '',
+        required: true,
+        displayOptions: {
+          show: { resource: ['secret'], operation: ['set'] },
+        },
+        description: 'The secret value',
+      },
+      {
+        displayName: 'On Conflict',
+        name: 'setOnConflict',
+        type: 'options',
+        options: [
+          { name: 'Error', value: 'error', description: 'Throw an error if the key already exists (409)' },
+          { name: 'Ignore', value: 'ignore', description: 'Return the existing secret ID silently' },
+        ],
+        default: 'error',
+        displayOptions: {
+          show: { resource: ['secret'], operation: ['set'] },
+        },
+        description: 'What to do when the key already exists in the org',
       },
       {
         displayName: 'New Value',
@@ -562,32 +571,56 @@ export class Sirr implements INodeType {
               expires_at: h['x-sirr-expires-at'] ? parseInt(h['x-sirr-expires-at'], 10) : null,
             };
           } else if (operation === 'push') {
-            const key = this.getNodeParameter('pushKey', i) as string;
+            // Public dead drop — no key, no org routing. Returns { id }.
             const value = this.getNodeParameter('value', i) as string;
             const ttl = this.getNodeParameter('ttlSeconds', i) as number;
             const maxReads = this.getNodeParameter('maxReads', i) as number;
-            const sealOnExpiry = this.getNodeParameter('sealOnExpiry', i) as boolean;
-            const allowedKeysStr = this.getNodeParameter('allowedKeys', i) as string;
-            const body: IDataObject = {
-              key,
-              value,
-              ttl_seconds: ttl || null,
-              max_reads: maxReads || null,
-            };
-            if (sealOnExpiry) body.delete = false;
-            if (allowedKeysStr.trim()) {
-              body.allowed_keys = allowedKeysStr.split(',').map((k) => k.trim()).filter(Boolean);
-            }
+            const body: IDataObject = { value };
+            if (ttl) body.ttl_seconds = ttl;
+            if (maxReads) body.max_reads = maxReads;
             response = await this.helpers.httpRequestWithAuthentication.call(
               this,
               'sirrApi',
               {
                 method: 'POST',
-                url: `${baseUrl}${buildPath(org, '/secrets')}`,
+                url: `${baseUrl}/secrets`,
                 body,
                 json: true,
               },
             );
+          } else if (operation === 'set') {
+            // Org named secret — requires org in credentials. Returns 409 if key exists.
+            if (!org) {
+              throw new NodeApiError(this.getNode(), {} as JsonObject, {
+                message: 'Set requires an Organization ID in credentials',
+              });
+            }
+            const setKey = this.getNodeParameter('setKey', i) as string;
+            const setValue = this.getNodeParameter('setValue', i) as string;
+            const onConflict = this.getNodeParameter('setOnConflict', i, 'error') as string;
+            try {
+              response = await this.helpers.httpRequestWithAuthentication.call(
+                this,
+                'sirrApi',
+                {
+                  method: 'POST',
+                  url: `${baseUrl}/orgs/${encodeURIComponent(org)}/secrets`,
+                  body: { key: setKey, value: setValue },
+                  json: true,
+                },
+              );
+            } catch (setError) {
+              const err = setError as Error & {
+                response?: { statusCode?: number };
+                cause?: { response?: { statusCode?: number } };
+              };
+              const statusCode = err?.response?.statusCode ?? err?.cause?.response?.statusCode;
+              if (statusCode === 409 && onConflict === 'ignore') {
+                response = { conflict: true, key: setKey, message: 'Key already exists' };
+              } else {
+                throw setError;
+              }
+            }
           } else if (operation === 'patch') {
             const key = this.getNodeParameter('key', i) as string;
             const patchValue = this.getNodeParameter('patchValue', i) as string;
